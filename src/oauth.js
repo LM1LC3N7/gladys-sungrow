@@ -110,9 +110,10 @@ export function tokenOf(data, now) {
 
 /**
  * The token endpoints (`token`: a code; `refresh`: the renewal token), JSON,
- * the secret key in `x-access-key`. 400/401 or an answer without a token:
- * `refused`, with a safe code as detail; 429, 5xx and "too frequent" / "busy"
- * answers: transient; anything else: `http`.
+ * the secret key in `x-access-key`. 400/401, or an answer without a token
+ * that refuses the token or the app: `refused`, with a safe code as detail;
+ * 429, 5xx and "too frequent" / "busy" answers: transient; another answer
+ * without a token: `api_error` (never a refusal); another status: `http`.
  */
 export async function tokenRequest(
   transport,
@@ -161,11 +162,19 @@ export async function tokenRequest(
     return token;
   }
   const error = envelopeError(data ?? null);
-  if (error && (error.kind === 'rate_limited' || error.kind === 'unavailable')) {
+  // A refusal only when the answer says so: the token or the app refused. Any
+  // other error (unknown code, a text not recognized) is not one: the renewal
+  // keeps its session and is tried again later (1, 5, 15, 60 minutes).
+  if (error?.kind === 'unauthorized' || error?.kind === 'app_refused') {
+    throw new SungrowError('refused', 'iSolarCloud refused the sign-in', {
+      detail: error.detail ?? 'refused',
+    });
+  }
+  if (error && error.kind !== 'api_error') {
     throw error;
   }
-  throw new SungrowError('refused', 'iSolarCloud refused the sign-in', {
-    detail: error?.detail ?? 'no token',
+  throw new SungrowError('api_error', 'iSolarCloud answered without a token', {
+    detail: error?.detail,
   });
 }
 

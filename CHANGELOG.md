@@ -37,5 +37,27 @@ the notes of the version's GitHub Release.
   "busy" pauses kept in `/data`, and a ceiling of 600 requests per UTC day.
 - Transport badges, English and French texts, documentation, cover image.
 - Never tested with a real account nor a real device yet.
+- The solar production index comes with its "Solar production (30
+  minutes)" feature, filled by Gladys, so the production reaches the energy
+  monitoring.
+
+### Fixed
+
+- A restart right after a good read stays connected until the next read.
+- The "Test iSolarCloud" button never reads sooner than the refresh interval
+  nor during a pause: it shows the last result and when the next read comes
+  (it still reads once to lift an "access refused" stop).
+- An unknown error answered to a token renewal no longer ends the session:
+  it is tried again after 1, 5, 15 then 60 minutes; a "system error" text is
+  a pause.
+- New keys saved while a renewal or an authorization is running drop its
+  answer.
+- A deleted device takes its index guard states out of `/data`.
+- A text about one plant ("unauthorized", "authorization") is no longer
+  taken for a refused token.
+- "Finish the authorization" shows back only a safe error code, never the
+  error description of the pasted address.
+- The guide of the developer app sticks to the four steps of pysolarcloud;
+  what other projects say is marked as not checked.
 
 [Unreleased]: https://github.com/LM1LC3N7/gladys-sungrow/commits/main

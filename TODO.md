@@ -26,6 +26,16 @@ up to date at the end of every milestone.
       and 24). The store validator cannot run from the development sandbox: it
       runs at publication. No Docker on this PC: the image was not built here
       (the CI builds it).
+- [x] **Milestone 1 fixes — review 1** (2026-10-20): the 30-minute
+      production feature declared under the production index (UUID v5 ids);
+      a restart after a good read stays connected; the test button never
+      reads sooner than the interval nor during a pause (one read only to
+      lift "access refused"); an unknown error of the renewal keeps the
+      session (tried again 1, 5, 15, 60 min), "系统异常" is a busy pause; the
+      developer app guide holds to pysolarcloud's four steps, the rest marked
+      unverified; new keys during a renewal or an exchange drop its answer; a
+      deleted device takes its guard states out of `/data`; the token pattern
+      no longer matches "authorization"; only a safe code of a pasted error.
 - [ ] **Milestone 2 — real account**: run against a real account and
       inverter (see "To check on a real account"), turn the answers
       (anonymized) into fixtures, fix what differs.
@@ -36,9 +46,12 @@ up to date at the end of every milestone.
 
 ## To check on a real account
 
-- The developer portal: the exact wording of the app form ("authorize with
-  OAuth2.0"), where the Application Id shows, how long the approval takes,
-  whether the redirect URL may be any https address (and whether a
+- The developer portal (only pysolarcloud's four steps are documented as
+  facts): whether it takes the Sungrow account's credentials (other projects
+  say so) or needs a separate account, the exact wording of the app form
+  ("authorize with OAuth2.0"), where the Application Id shows, how long the
+  approval takes and how the portal shows it, whether the app is tied to one
+  server, whether the redirect URL may be any https address (and whether a
   `http://localhost` one is accepted).
 - The authorization page: that `state` comes back in the query of the
   redirect (pysolarcloud says it does when placed before the `#`); without
@@ -52,7 +65,10 @@ up to date at the end of every milestone.
 - The error answers: the `result_code` values and texts of a refused token,
   a refused Appkey / Secret Key, a too frequent access, a busy server. They
   are classified from their text here (`src/http.js` `envelopeError`);
-  adjust the patterns to the real codes.
+  adjust the patterns to the real codes. The token pattern (`token`,
+  `login`, "未登录") was narrowed after review: a text about one plant
+  ("unauthorized", "authorization") is an ordinary error, not a stop; check
+  what a plant the app may not read answers.
 - Rate limits: none published by Sungrow. 5 minutes per read (one request for
   all the plants), the list every 6 hours, at most 600 requests a day.
 - The real-time data: which points a hybrid inverter (SH series) and a
@@ -94,10 +110,15 @@ up to date at the end of every milestone.
   a new click and never reuses the code.
 - **Renewal by timer** (as gladys-weheat): at `expiresAt - min(5 min,
 lifetime / 2)`, floored at the last renewal + 1 minute and at the end of a
-  pause or of a failed renewal (1, 5, 15, 60 min). An answer of the refresh
-  endpoint without a token (other than "too frequent" / "busy") or a 400/401
+  pause or of a failed renewal (1, 5, 15, 60 min). A 400/401 of the refresh
+  endpoint, or an answer without a token that refuses the token or the app,
   is the `expired` stop: session dropped, stop kept in `/data`, only a new
-  authorization lifts it. Without `expires_in`, one hour.
+  authorization lifts it. Any other answer without a token (an unknown code
+  or text) is NOT a refusal (review 1): the session is kept and the renewal
+  tried again after 1, 5, 15, 60 min; "too frequent" / "busy" (Chinese
+  "系统", "异常" included) are pauses. Without `expires_in`, one hour. New
+  keys saved while a renewal or a code exchange is in flight move the epoch:
+  its answer is dropped, never stored under the new client.
 - **A refused token** (envelope text about the token, or HTTP 401): when the
   timer renewed the token meanwhile, one retry with the new token; otherwise
   one renewal and one retry; refused with a token obtained in this cycle, the
@@ -116,6 +137,14 @@ lifetime / 2)`, floored at the last renewal + 1 minute and at the end of a
   renewal meets a read): reached, every path waits for the next UTC day.
   Pauses, budget and last cycle kept in `/data`, capped when read back, kept
   across a reconnection.
+- **Test button** (review 1): never a read sooner than the interval since the
+  last cycle, nor during any pause (backoff included): it answers the last
+  status and when the next read comes. One click = one read only to lift the
+  `unauthorized` stop. 30 seconds between clicks.
+- **Restart after a good read** (review 1): the start of the last cycle that
+  succeeded is kept in `/data` (`lastSuccessAt`, cleared by any failure,
+  pause or stop); a restart before the next read shows "connected, N
+  plant(s), next read in X" and still waits for the interval.
 - **Devices**: per plant, `plant:<ps_id>` always, `grid:<ps_id>` once a grid
   value shows, `battery:<ps_id>` once a state of charge shows; created ones
   stay offered. The grid is its own device so that a home already metered in
@@ -131,6 +160,14 @@ lifetime / 2)`, floored at the last renewal + 1 minute and at the end of a
   energy contract must take them for the power drawn); charge
   `battery/integer` %. `battery-storage` and `grid-sensor` are left for
   later (not known by every supported Gladys).
+- **30-minute production** (review 1, as gladys-imeon and gladys-apsystems):
+  the core derives `thirty-minutes-production` for a consumption index only,
+  so `production_30min` (`energy-production-sensor/thirty-minutes-production`,
+  kWh) is declared on the plant device, its `id` and `energy_parent_id` UUID
+  v5 of the external ids of itself and of `production_index` (which carries
+  its UUID v5 `id` too), so an "Update" in Discovery keeps the same rows. The
+  integration never publishes a state on it. The energy bought index gets
+  its 30-minute feature from the core.
 - **Index guard**: `src/guard.js` is gladys-p1-monitor's approved guard taken
   as is, with `maxKw` and the slack (0.5 kWh) as parameters (`indexOfTariffs`,
   specific to a P1 meter, left out). `maxKw` comes from the configuration.
@@ -139,7 +176,10 @@ lifetime / 2)`, floored at the last renewal + 1 minute and at the end of a
   the value Gladys holds (`last_value`, `last_value_changed`). While a value
   is held, the last accepted one is sent again; the status lists every held
   index; "Accept the held indexes" accepts them all, as shown (bounded), taken
-  at the next read. The indexes are dated with the time of the read.
+  at the next read. The guard dates each value with the time of the read;
+  the state is published to Gladys without a date (Gladys dates it on
+  receipt). A deleted device takes its guard states out of `/data`; the
+  stored states are bounded (80, the most recent kept).
 - **Units**: from the `point_dict` of the answer (Wh, kWh, MWh; W, kW, MW;
   %); without a unit, Wh and W as documented by pysolarcloud; another unit
   drops the value. Glitches (an energy below 0, a power above 10 MW, a

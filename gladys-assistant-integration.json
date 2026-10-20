@@ -21,8 +21,8 @@
         "fr": "Les centrales Sungrow dans Gladys"
       },
       "description": {
-        "en": "Unofficial connector, not affiliated with Sungrow. It reads your Sungrow inverters and batteries through the official iSolarCloud OpenAPI, read only: solar power and production, home consumption, energy bought from and fed into the grid, battery charge and power. The solar production and the energy bought are energy indexes, checked before Gladys counts them. It needs a developer app you create yourself on the Sungrow developer portal (free, approved by Sungrow): follow the guide. Your password is typed on the iSolarCloud page only. Never tested yet with a real account. Sungrow and iSolarCloud are trademarks of their owner.",
-        "fr": "Connecteur non officiel, sans lien avec Sungrow. Il lit vos onduleurs et batteries Sungrow par l'API officielle iSolarCloud OpenAPI, en lecture seule : puissance et production solaires, consommation de la maison, énergie achetée au réseau et injectée, charge et puissance de la batterie. La production solaire et l'énergie achetée sont des index d'énergie, contrôlés avant que Gladys les compte. Il faut une application développeur que vous créez vous-même sur le portail développeur de Sungrow (gratuite, validée par Sungrow) : suivez le guide. Votre mot de passe se saisit sur la page d'iSolarCloud seulement. Jamais testé pour l'instant avec un vrai compte. Sungrow et iSolarCloud sont des marques de leur propriétaire."
+        "en": "Unofficial connector, not affiliated with Sungrow. It reads your Sungrow inverters and batteries through the official iSolarCloud OpenAPI, read only: solar power and production, home consumption, energy bought from and fed into the grid, battery charge and power. The solar production and the energy bought are energy indexes, checked before Gladys counts them. It needs a developer app you create yourself on the Sungrow developer portal (approved by Sungrow): follow the guide. Your password is typed on the iSolarCloud page only. Never tested yet with a real account. Sungrow and iSolarCloud are trademarks of their owner.",
+        "fr": "Connecteur non officiel, sans lien avec Sungrow. Il lit vos onduleurs et batteries Sungrow par l'API officielle iSolarCloud OpenAPI, en lecture seule : puissance et production solaires, consommation de la maison, énergie achetée au réseau et injectée, charge et puissance de la batterie. La production solaire et l'énergie achetée sont des index d'énergie, contrôlés avant que Gladys les compte. Il faut une application développeur que vous créez vous-même sur le portail développeur de Sungrow (validée par Sungrow) : suivez le guide. Votre mot de passe se saisit sur la page d'iSolarCloud seulement. Jamais testé pour l'instant avec un vrai compte. Sungrow et iSolarCloud sont des marques de leur propriétaire."
       },
       "links": [
         {
@@ -251,8 +251,8 @@
         "fr": "Tester iSolarCloud"
       },
       "description": {
-        "en": "Reads the plants now and shows the result (once every 30 seconds at most).",
-        "fr": "Lit maintenant les centrales et affiche le résultat (une fois toutes les 30 secondes au plus)."
+        "en": "Shows the last result and the next read; reads only once the refresh interval has passed since the last read (never during a pause), or once after an access refused.",
+        "fr": "Affiche le dernier résultat et la prochaine lecture ; ne lit que si l'intervalle de relecture est écoulé depuis la dernière lecture (jamais pendant une pause), ou une fois après un accès refusé."
       }
     },
     {

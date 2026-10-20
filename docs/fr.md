@@ -18,6 +18,7 @@ Pour chaque centrale (« plant ») que vous autorisez, jusqu'à trois appareils 
 | -------------------------------------- | ---------------------------------------------- | ------------------------------ |
 | **Centrale** (toujours)                | Puissance solaire                              | W, production                  |
 |                                        | Production solaire (index)                     | kWh, **index de production**   |
+|                                        | Production solaire (30 minutes)                | kWh, remplie par Gladys        |
 |                                        | Production solaire du jour                     | capteur simple (kWh)           |
 |                                        | Puissance, consommation du jour et totale      | capteurs simples (W, kWh)      |
 | **Réseau** (si iSolarCloud le donne)   | Énergie achetée au réseau (index)              | kWh, **index de consommation** |
@@ -30,7 +31,9 @@ Pour chaque centrale (« plant ») que vous autorisez, jusqu'à trois appareils 
 ### Les deux index d'énergie
 
 - **Production solaire (index)** : le total produit par la centrale depuis sa
-  mise en service. Gladys en déduit la production de chaque demi-heure.
+  mise en service. Il est accompagné de la fonction **Production solaire
+  (30 minutes)**, que Gladys remplit elle-même depuis l'index (l'intégration
+  n'y écrit jamais) : c'est elle qui alimente le suivi d'énergie.
 - **Énergie achetée au réseau (index)** : le total acheté au réseau, compté
   par Gladys comme consommation électrique (avec son coût, selon votre
   contrat d'énergie dans Gladys).
@@ -61,39 +64,42 @@ ne les compte nulle part.
 ## Étape 1 : créer votre application développeur Sungrow
 
 L'API iSolarCloud demande une **application développeur** que vous créez
-vous-même, une seule fois, sur le portail de Sungrow. C'est gratuit, mais
-Sungrow doit la **valider** (cela peut prendre quelques jours).
+vous-même, une seule fois, sur le portail de Sungrow. Les quatre étapes
+ci-dessous sont celles de la bibliothèque `pysolarcloud` :
 
-1. Ouvrez le portail développeur iSolarCloud :
-   <https://developer-api.isolarcloud.com/> et **créez un compte** (il est
-   distinct de votre compte iSolarCloud habituel).
-2. Créez une **application** (« Create application ») :
-   - donnez-lui un nom (par exemple « Gladys ») ;
+1. Créez un compte sur le portail développeur iSolarCloud :
+   <https://developer-api.isolarcloud.com/>.
+2. Créez une **application** dans le portail :
    - à la question « authorize with OAuth2.0 », répondez **Yes** ;
-   - **Redirect URL** : l'adresse vers laquelle iSolarCloud renverra votre
-     navigateur après l'autorisation. Deux possibilités :
+   - donnez une **Redirect URL** (elle peut être changée plus tard) :
+     l'adresse vers laquelle iSolarCloud renverra votre navigateur après
+     l'autorisation. Deux possibilités :
      - **l'adresse de retour de votre Gladys** (recommandé). Pour la
        connaître : faites d'abord l'étape 2 ci-dessous sans URL de
        redirection, cliquez une fois sur **Connecter** : le statut de
        l'intégration affiche « L'adresse de retour de ce Gladys est … ».
-       Copiez-la dans le portail (elle peut être changée plus tard) ;
-     - **une autre adresse à vous** en https (même une page qui n'existe
-       pas) : il faudra alors copier-coller l'adresse finale (voir plus bas).
-3. Attendez que Sungrow **valide** l'application (son état passe à approuvé
-   dans le portail).
-4. Dans le portail, ouvrez votre application et notez :
+       Copiez-la dans le portail ;
+     - **une autre adresse à vous** en https : il faudra alors copier-coller
+       l'adresse finale (voir plus bas).
+3. Attendez que Sungrow **valide** l'application.
+4. Dans le portail, relevez :
    - l'**Appkey** ;
    - la **Secret Key** ;
    - l'**Application Id** : il apparaît dans l'URL d'autorisation affichée par
      le portail, après `applicationId=` (un nombre).
+
+Non vérifié, d'après d'autres projets : le portail accepterait aussi les
+identifiants de votre compte Sungrow (essayez-les avant d'en créer un
+nouveau) ; la durée de la validation et la façon dont le portail l'affiche
+ne sont pas connues.
 
 ## Étape 2 : configurer l'intégration
 
 Dans **Intégrations → Sungrow iSolarCloud → Configuration** :
 
 1. **Serveur iSolarCloud** : celui de votre compte (**Europe** pour la France,
-   la Belgique, la Suisse). L'application développeur doit être sur le même
-   serveur.
+   la Belgique, la Suisse). Non vérifié : l'application développeur est
+   probablement liée au même serveur.
 2. **Appkey**, **Secret Key**, **Application Id** : ceux de l'étape 1.
 3. Laissez **URL de redirection** vide si l'application renvoie vers Gladys ;
    sinon, saisissez l'adresse enregistrée dans le portail.
@@ -164,8 +170,12 @@ un refus (HTTP 429 ou réponse « trop fréquent ») par une pause.
 | Accès refusé même avec un nouveau jeton, ou clés refusées     | arrêt gardé : vérifiez les clés, puis Connecter ou « Tester iSolarCloud »           |
 
 L'intégration ne se reconnecte jamais d'elle-même et ne réessaie jamais un
-refus : seul un clic le fait. Le bouton **Tester iSolarCloud** relit les
-centrales tout de suite (une fois toutes les 30 secondes au plus).
+refus : seul un clic le fait. Le bouton **Tester iSolarCloud** ne relit
+jamais plus vite que l'intervalle ni pendant une pause : il affiche le
+dernier résultat et l'heure de la prochaine lecture, et ne lit que si
+l'intervalle est écoulé depuis la dernière lecture. Il relit tout de suite
+une seule fois après un arrêt « accès refusé » (c'est ainsi qu'on le lève).
+Une fois toutes les 30 secondes au plus.
 
 ## Dépannage
 

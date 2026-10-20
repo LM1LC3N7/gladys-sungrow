@@ -60,7 +60,10 @@ Gladys ⇄ SDK ⇄ src/handlers.js ⇄ src/app.js (SungrowApp)
   production total) and `energy-sensor/index` (energy bought total), both
   through the guard of gladys-p1-monitor (never 0, drops and jumps held,
   never confirmed by time, two-click bounded acceptance, `maxKw` from the
-  configuration). Solar power is `energy-production-sensor/power`, the
+  configuration), the production index with its
+  `thirty-minutes-production` feature declared (UUID v5 `id` /
+  `energy_parent_id`, filled by the core, never published by the
+  integration). Solar power is `energy-production-sensor/power`, the
   charge `battery/integer` (%), everything else plain sensors. The Discovery
   list never shrinks; status and Discovery are sent again at every
   reconnection to Gladys.

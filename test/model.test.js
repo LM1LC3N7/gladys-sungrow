@@ -10,7 +10,7 @@ import { createFakeGladys } from '@gladysassistant/integration-sdk/testing';
 import { POINT_IDS } from '../src/api.js';
 import { clientKey, normalizeConfig } from '../src/config.js';
 import { LIMITS, SERVERS } from '../src/constants.js';
-import { KINDS, buildDevice, deviceStates, indexValues, kindsOf } from '../src/devices.js';
+import { KINDS, buildDevice, deviceStates, indexValues, kindsOf, uuidOf } from '../src/devices.js';
 import { IndexGuard } from '../src/guard.js';
 import {
   SungrowError,
@@ -419,4 +419,44 @@ test('index guard: under a held jump, an old reference never lets a big rise thr
   assert.equal(guard.held.to, 14_000);
   assert.equal(guard.accept(1000.2, 10 * DAY + 2 * MINUTE), true);
   assert.equal(guard.held, undefined);
+});
+
+test('the 30-minute production: fixed UUID v5 ids tied to the production index, no state', () => {
+  const gladys = createFakeGladys({ config: {} });
+  const plant = { id: PLANT_A, name: 'Maison' };
+  const d = buildDevice(gladys, 'plant', plant, 'en');
+  const index = d.features.find((f) => f.external_id.endsWith(':production_index'));
+  const derived = d.features.find((f) => f.external_id.endsWith(':production_30min'));
+  assert.equal(derived.category, 'energy-production-sensor');
+  assert.equal(derived.type, 'thirty-minutes-production');
+  assert.equal(derived.unit, 'kilowatt-hour');
+  assert.equal(index.id, uuidOf(index.external_id));
+  assert.equal(derived.id, uuidOf(derived.external_id));
+  assert.equal(derived.energy_parent_id, index.id);
+  assert.match(index.id, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  assert.equal(buildDevice(gladys, 'plant', plant, 'fr').features[2].id, derived.id, 'stable');
+  const values = parseRealtime(realtimeDto([pointsDto(PLANT_A)]).result_data).get(PLANT_A);
+  const roles = deviceStates(gladys, 'plant', PLANT_A, values).map(([id]) => id.split(':').at(-1));
+  assert.ok(!roles.includes('production_30min') && !roles.includes('production_index'));
+  assert.deepEqual(
+    indexValues(gladys, 'plant', PLANT_A, values).map(([, , role]) => role),
+    ['production_index'],
+  );
+  // The other features carry no id of ours.
+  assert.equal(d.features.find((f) => f.external_id.endsWith(':pv_power')).id, undefined);
+});
+
+test('a text about a plant or an authorization is no token refusal', () => {
+  assert.equal(
+    envelopeError({ result_code: 'E7', result_msg: 'unauthorized plant' }).kind,
+    'api_error',
+  );
+  assert.equal(
+    envelopeError({ result_code: 'E8', result_msg: 'no authorization for ps_id' }).kind,
+    'api_error',
+  );
+  assert.equal(
+    envelopeError({ result_code: 'E9', result_msg: '系统异常，请稍后重试' }).kind,
+    'unavailable',
+  );
 });

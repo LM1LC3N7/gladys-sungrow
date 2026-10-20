@@ -6,6 +6,8 @@
 //     client they belong to (a hash of the server, the app key and the app id);
 //   - a stop that only the user can lift (renewal refused, access or app
 //     refused), with its client, so a restart never retries it;
+//   - when the last cycle succeeded (a restart before the next read stays
+//     connected), cleared by any failure, pause or stop;
 //   - the end of a 429, 5xx, daily budget or error pause, capped when read
 //     again, and when the last read cycle started (a restart never reads sooner);
 //   - when the token was last renewed (never two renewals within a minute);
@@ -109,7 +111,9 @@ function indexes(raw) {
   if (!source || typeof source !== 'object' || Array.isArray(source)) {
     return out;
   }
-  for (const [id, state] of Object.entries(source).slice(0, LIMITS.plants * 2)) {
+  // Two indexes per plant; the entries of a deleted device are removed by the
+  // app. Bounded with room to spare, the most recent kept.
+  for (const [id, state] of Object.entries(source).slice(-LIMITS.plants * 4)) {
     if (typeof id !== 'string' || id.length > 200 || !id.startsWith('ext:')) {
       continue;
     }
@@ -139,6 +143,7 @@ export function normalizeMemory(raw, now = Date.now()) {
   const until = time(pause?.until);
   const lastRenewAt = time(raw?.lastRenewAt);
   const lastCycleAt = time(raw?.lastCycleAt);
+  const lastSuccessAt = time(raw?.lastSuccessAt);
   const requests = raw?.requests;
   return {
     session: session(raw),
@@ -154,6 +159,8 @@ export function normalizeMemory(raw, now = Date.now()) {
     lastRenewAt: lastRenewAt === undefined ? null : Math.min(lastRenewAt, now),
     // The start of the last read cycle: the first read after a restart waits the interval.
     lastCycleAt: lastCycleAt === undefined ? null : Math.min(lastCycleAt, now),
+    // The start of the last cycle that succeeded, cleared by any failure, pause or stop.
+    lastSuccessAt: lastSuccessAt === undefined ? null : Math.min(lastSuccessAt, now),
     // The requests of today only; another day starts from 0.
     requests:
       requests && requests.day === dayOf(now) && Number.isSafeInteger(requests.count)

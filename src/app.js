@@ -20,7 +20,7 @@ import { normalizeConfig } from './config.js';
 import { DAY, INDEX_SLACK_KWH, LIMITS, MINUTE, SECOND, SERVERS, TIMINGS } from './constants.js';
 import { KINDS, buildDevice, deviceIds, deviceStates, indexValues, kindsOf } from './devices.js';
 import { IndexGuard } from './guard.js';
-import { SungrowError, errorReason, httpsTransport, networkError } from './http.js';
+import { SungrowError, errorReason, httpsTransport, networkError, safeCode } from './http.js';
 import { FEATURE_NAMES, T, age, join } from './i18n.js';
 import { parsePlants, parseRealtime } from './model.js';
 import { SignIns, authorizeUrl, baseOf, parseRedirect, tokenRequest } from './oauth.js';
@@ -42,6 +42,8 @@ const HARD = new Set(['rate', 'unavailable', 'budget']);
 const OFFLINE = new Set(['network', 'timeout', 'unavailable', 'bad_response', 'size', 'http']);
 /** The fields of a Gladys feature that a publication carries. */
 const FEATURE_FIELDS = [
+  'id',
+  'energy_parent_id',
   'name',
   'external_id',
   'category',
@@ -151,6 +153,8 @@ export class SungrowApp {
 
   async start(raw = {}) {
     this.stop();
+    // A renewal or an exchange still in flight belongs to the previous keys: dropped.
+    this.epoch += 1;
     await this.running;
     this.config = normalizeConfig(raw);
     this.reset();
@@ -189,6 +193,18 @@ export class SungrowApp {
     const due = Math.max((this.memory.lastCycleAt ?? -Infinity) + this.interval, this.pausedUntil);
     if (due > this.now()) {
       // The status says when the read comes, never "reading" while it waits.
+      // The last cycle succeeded and nothing failed nor paused since: still connected.
+      const success = this.memory.lastSuccessAt;
+      if (
+        this.pausedUntil <= this.now() &&
+        success !== null &&
+        success >= (this.memory.lastCycleAt ?? -Infinity)
+      ) {
+        this.connectedOnce = true;
+        await this.setStatus(true, join(this.okMessage(), T.nextRead(age(due - this.now()))));
+        this.scheduleAt(due);
+        return;
+      }
       await this.setStatus(false, this.pauseMessage() ?? T.nextRead(age(due - this.now())));
       this.scheduleAt(due);
       return;
@@ -350,6 +366,7 @@ export class SungrowApp {
     }
     this.pausedUntil = Math.max(this.pausedUntil, this.now() + wait);
     this.memory.pause = { kind: this.pauseKind, until: this.pausedUntil };
+    this.memory.lastSuccessAt = null;
     await this.saveMemory();
     return this.pausedUntil - this.now();
   }
@@ -379,6 +396,7 @@ export class SungrowApp {
   /** A stop only the user lifts: kept in /data with its client. */
   async block(kind) {
     this.blocked = kind;
+    this.memory.lastSuccessAt = null;
     this.clearTimer();
     if (kind === 'expired') {
       // The renewal token is useless now: a new authorization replaces it.
@@ -769,6 +787,8 @@ export class SungrowApp {
     this.connectedOnce = true;
     this.pauseKind = undefined;
     this.pausedUntil = 0;
+    // Kept in /data: a restart before the next read stays connected (cleared by any failure).
+    this.memory.lastSuccessAt = this.cycleStart;
     if (this.memory.pause) {
       this.memory.pause = null;
       await this.saveMemory();
@@ -793,6 +813,7 @@ export class SungrowApp {
 
   async failed(err) {
     const reason = errorReason(err);
+    this.memory.lastSuccessAt = null;
     switch (err.kind) {
       case 'signed_out':
         if (!this.blocked) {
@@ -1101,6 +1122,17 @@ export class SungrowApp {
           this.guards.delete(id);
         }
       }
+      // Its guard states in /data go too: a device created again starts afresh.
+      let changed = false;
+      for (const id of Object.keys(this.memory.indexes)) {
+        if (id.startsWith(`${device.external_id}:`)) {
+          delete this.memory.indexes[id];
+          changed = true;
+        }
+      }
+      if (changed) {
+        await this.saveMemory();
+      }
     }
   }
 
@@ -1164,12 +1196,8 @@ export class SungrowApp {
       return T.signIn.noCode;
     }
     if (parsed.error) {
-      const detail = `${parsed.error}${
-        parsed.errorDescription
-          ? `: ${String(parsed.errorDescription).replace(/\s+/g, ' ').slice(0, 120)}`
-          : ''
-      }`.slice(0, 160);
-      return T.signIn.cancelled(detail);
+      // Only a safe code: a text of the pasted address is never shown back.
+      return T.signIn.cancelled(safeCode(parsed.error) ?? 'error');
     }
     // The state ties the address to an authorization started here: never guessed.
     if (!parsed.state || !parsed.code) {
@@ -1199,6 +1227,9 @@ export class SungrowApp {
       this.signIns.restore(signIn);
       return this.pauseMessage();
     }
+    // New keys saved during the exchange (a restart) drop its answer.
+    const epoch = this.epoch;
+    const client = this.config.client;
     let token;
     try {
       token = await tokenRequest(
@@ -1232,6 +1263,9 @@ export class SungrowApp {
       // iSolarCloud was not reached: the same address can be pasted again.
       this.signIns.restore(signIn);
       return T.signIn.failed(errorReason(err));
+    }
+    if (epoch !== this.epoch || client !== this.config.client) {
+      return T.signIn.unknown;
     }
     if (!token.refreshToken) {
       return T.signIn.noRefresh;
@@ -1282,19 +1316,34 @@ export class SungrowApp {
     if (this.running) {
       return T.busy;
     }
-    this.lastTestAt = this.now();
-    // One read per click: the button is how a refused access is tried again.
     if (this.blocked === 'unauthorized') {
+      // One read per click: the button is how a refused access is tried again.
+      this.lastTestAt = this.now();
       this.blocked = undefined;
       this.memory.block = null;
+      if (this.pauseKind === 'backoff') {
+        this.pausedUntil = 0;
+        this.pauseKind = undefined;
+        this.memory.pause = null;
+      }
       await this.saveMemory();
       this.scheduleRenew();
+      await this.tick({ quick: true });
+      return this.lastMessage ?? T.signedOut;
     }
-    if (this.pauseKind === 'backoff') {
-      this.pausedUntil = 0;
-      this.pauseKind = undefined;
-      this.memory.pause = null;
+    // Otherwise never sooner than the interval, nor during an error pause:
+    // the last result and when the next read comes.
+    const due = Math.max(
+      (this.memory.lastCycleAt ?? -Infinity) + this.interval,
+      this.pausedUntil,
+      this.renewRetryAt,
+    );
+    if (due > this.now()) {
+      const next = T.nextRead(age(due - this.now()));
+      const last = this.lastMessage;
+      return last ? join(last, next) : next;
     }
+    this.lastTestAt = this.now();
     await this.tick({ quick: true });
     return this.lastMessage ?? T.signedOut;
   }

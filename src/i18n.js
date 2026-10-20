@@ -40,6 +40,7 @@ export const DEVICE_NAMES = {
 export const FEATURE_NAMES = {
   pv_power: both('Solar power', 'Puissance solaire'),
   production_index: both('Solar production (index)', 'Production solaire (index)'),
+  production_30min: both('Solar production (30 minutes)', 'Production solaire (30 minutes)'),
   production_today: both('Solar production today (kWh)', 'Production solaire du jour (kWh)'),
   load_power: both('Home consumption power (W)', 'Puissance consommée par la maison (W)'),
   load_today: both('Home consumption today (kWh)', 'Consommation de la maison du jour (kWh)'),

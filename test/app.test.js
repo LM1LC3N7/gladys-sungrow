@@ -241,9 +241,14 @@ test('another redirect URL: the pasted address finishes the authorization', asyn
   let ack = await gladys.fake.action(ACTIONS.FINISH_SIGN_IN, { url: 'hello' });
   assert.match(ack.data.message.en, /No authorization code/);
   ack = await gladys.fake.action(ACTIONS.FINISH_SIGN_IN, {
-    url: `${redirect}?error=access_denied&state=${back.state}`,
+    url: `${redirect}?error=access_denied&error_description=Click+evil.example+now&state=${back.state}`,
   });
   assert.match(ack.data.message.en, /did not authorize the app \(access_denied\)/);
+  assert.doesNotMatch(ack.data.message.en, /evil/, 'only a safe code is shown back');
+  ack = await gladys.fake.action(ACTIONS.FINISH_SIGN_IN, {
+    url: `${redirect}?error=%3Cscript%3E&state=${back.state}`,
+  });
+  assert.match(ack.data.message.en, /did not authorize the app \(error\)/);
   ack = await gladys.fake.action(ACTIONS.FINISH_SIGN_IN, { url: `${redirect}?code=${back.code}` });
   assert.match(ack.data.message.en, /No authorization code/);
   for (const other of [
@@ -584,17 +589,122 @@ test('new keys drop the session of the previous app', async (t) => {
   assert.equal(server.requests.length, before);
 });
 
-test('the test button reads at once, then waits 30 seconds between clicks', async (t) => {
-  const { gladys, server } = await setup(t);
+test('the test button never reads sooner than the interval, nor during an error pause', async (t) => {
+  const { gladys, app, server, advance } = await setup(t);
   const before = server.of('realtime').length;
+  // Right after a read: the last result and when the next read comes, nothing sent.
   let ack = await gladys.fake.action(ACTIONS.TEST_CONNECTION);
+  assert.match(ack.data.message.en, /Connected to iSolarCloud.*next read in 5 min/);
+  assert.equal(server.of('realtime').length, before);
+  // The interval passed since the last read: one read, then 30 seconds between clicks.
+  app.memory.lastCycleAt -= 5 * MINUTE;
+  ack = await gladys.fake.action(ACTIONS.TEST_CONNECTION);
   assert.match(ack.data.message.en, /Connected to iSolarCloud/);
   assert.equal(server.of('realtime').length, before + 1);
   ack = await gladys.fake.action(ACTIONS.TEST_CONNECTION);
   assert.match(ack.data.message.en, /less than 30 seconds/);
   assert.equal(server.of('realtime').length, before + 1);
+  // An error pause: ten clicks 31 s apart never read nor lift it.
+  server.queue('realtime', answer(200, { result_code: 'E777', result_msg: 'weird' }));
+  await advance(5 * MINUTE, MINUTE);
+  assert.match(gladys.fake.connectionStatus.message.en, /could not be read/);
+  const paused = server.of('realtime').length;
+  for (let i = 0; i < 10; i += 1) {
+    ack = await gladys.fake.action(ACTIONS.TEST_CONNECTION);
+    assert.match(ack.data.message.en, /next read in/);
+    await advance(31 * SECOND, 31 * SECOND);
+  }
+  assert.ok(server.of('realtime').length <= paused + 1, 'only the timer reads again');
 });
 
+test('a restart right after a good read stays connected until the next read', async (t) => {
+  const store = memoryStore();
+  const server = fakeSungrow();
+  const first = await setup(t, { server, store });
+  await first.advance(MINUTE, 10 * SECOND);
+  first.app.stop();
+  const before = server.requests.length;
+  const { gladys, advance } = await setup(t, { server, store, mock: false, create: false });
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+  assert.match(message(gladys).en, /Connected to iSolarCloud: 1 plant\(s\).*next read in 4 min/);
+  assert.equal(server.requests.length, before, 'the interval is still respected');
+  await advance(4 * MINUTE, 30 * SECOND);
+  assert.ok(server.requests.length > before);
+  // After a failed read, a restart is not connected any more.
+  server.queue('realtime', answer(503, {}));
+  await advance(5 * MINUTE, 30 * SECOND);
+  assert.equal(store.data.lastSuccessAt, null);
+});
+
+test('a renewal answered with an unknown error keeps the session and is tried again', async (t) => {
+  const store = memoryStore();
+  const server = fakeSungrow({ expiresIn: 600 });
+  const { gladys, app, advance } = await setup(t, { server, store });
+  server.queue('refresh', answer(200, { result_code: 'E901', result_msg: 'unexpected' }));
+  await advance(5 * MINUTE + 10 * SECOND, 10 * SECOND);
+  assert.equal(server.of('refresh').length, 1);
+  assert.equal(app.blocked, undefined);
+  assert.equal(store.data.block, null);
+  assert.equal(store.data.session.refreshToken, 'refresh-1', 'the session is kept');
+  // Tried again one minute later, with the same renewal token: accepted.
+  await advance(70 * SECOND, 10 * SECOND);
+  assert.equal(server.of('refresh').length, 2);
+  assert.equal(store.data.session.refreshToken, 'refresh-2');
+  assert.equal(gladys.fake.connectionStatus.connected, true);
+});
+
+test('a renewal answered "system error" (Chinese text) is a pause, never a stop', async (t) => {
+  const store = memoryStore();
+  const server = fakeSungrow({ expiresIn: 600 });
+  const { app, advance } = await setup(t, { server, store });
+  server.queue('refresh', answer(200, { result_code: 'E900', result_msg: '系统异常，请稍后重试' }));
+  await advance(5 * MINUTE + 10 * SECOND, 10 * SECOND);
+  assert.equal(app.blocked, undefined);
+  assert.equal(store.data.pause.kind, 'unavailable');
+  assert.ok(store.data.session.refreshToken);
+});
+
+test('new keys saved while a renewal is in flight: its answer is dropped', async (t) => {
+  const server = fakeSungrow({ expiresIn: 600 });
+  const { gladys, app, store, advance } = await setup(t, { server });
+  let release;
+  server.queue('refresh', () => new Promise((resolve) => (release = resolve)));
+  await advance(6 * MINUTE, MINUTE);
+  assert.ok(release, 'renewal in flight');
+  await gladys.fake.configUpdated({ ...CONFIG, app_id: '9999' });
+  await settle();
+  release(answer(200, { access_token: 'OLD', refresh_token: 'OLD-R', expires_in: 3600 }));
+  await settle();
+  assert.equal(app.session, null, 'no session for the new keys');
+  assert.notEqual(app.memory.session?.client, app.config.client);
+  assert.ok(!JSON.stringify(store.data).includes('OLD-R'));
+  assert.match(message(gladys).en, /Not signed in/);
+});
+
+test('a deleted device takes its index guards out of /data', async (t) => {
+  const store = memoryStore();
+  const { gladys, advance } = await setup(t, { store });
+  const id = feature('grid', PLANT_A, 'import_index');
+  assert.ok(store.data.indexes[id]);
+  const grid = gladys.devices.find((d) => d.external_id === device('grid', PLANT_A));
+  await gladys.fake.deviceDeleted(grid);
+  await advance(SECOND, SECOND);
+  assert.equal(store.data.indexes[id], undefined);
+  assert.ok(store.data.indexes[feature('plant', PLANT_A, 'production_index')]);
+});
+
+test('the 30-minute production is declared under its index and never published', async (t) => {
+  const { gladys, advance } = await setup(t);
+  await advance(10 * MINUTE, MINUTE);
+  const plant = gladys.fake.discoveredDevices.find(
+    (d) => d.external_id === device('plant', PLANT_A),
+  );
+  const index = plant.features.find((f) => f.external_id.endsWith(':production_index'));
+  const derived = plant.features.find((f) => f.external_id.endsWith(':production_30min'));
+  assert.equal(derived.type, 'thirty-minutes-production');
+  assert.equal(derived.energy_parent_id, index.id);
+  assert.equal(gladys.fake.lastState(feature('plant', PLANT_A, 'production_30min')), undefined);
+});
 test('the reads stay within the daily budget at the default pace', async (t) => {
   const server = fakeSungrow({ expiresIn: 3600 });
   const { advance } = await setup(t, { server });

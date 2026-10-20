@@ -175,8 +175,9 @@ export function transientError({ status, headers = {} }, now) {
 }
 
 const RATE = /frequen|too many|too often|rate.?limit|limit.?exceed|exceed.*limit|频繁|超过/i;
-const BUSY = /busy|maintenance|try again later|temporarily|繁忙/i;
-const TOKEN = /token|unauthori[sz]ed|login|authori[sz]ation/i;
+const BUSY = /busy|maintenance|try again later|temporarily|繁忙|异常|系统/i;
+// Only the token or the login: a text about one plant ("unauthorized", "authorization") is no stop.
+const TOKEN = /token|login|未登录/i;
 const APP = /app.?key|access.?key|secret.?key|app.?id\b|application.?id/i;
 
 /**
