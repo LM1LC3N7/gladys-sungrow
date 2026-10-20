@@ -459,4 +459,15 @@ test('a text about a plant or an authorization is no token refusal', () => {
     envelopeError({ result_code: 'E9', result_msg: '系统异常，请稍后重试' }).kind,
     'unavailable',
   );
+  // A token or login text wins over a "busy" word: a refused token is never a pause.
+  for (const text of [
+    'token异常',
+    '登录异常',
+    '系统检测到token已失效',
+    'token invalid, try again later',
+  ]) {
+    assert.equal(envelopeError({ result_code: 'E1', result_msg: text }).kind, 'unauthorized', text);
+  }
+  assert.equal(envelopeError({ result_code: 'E1', result_msg: 'appkey异常' }).kind, 'app_refused');
+  assert.equal(envelopeError({ result_code: 'E1', result_msg: '异常' }).kind, 'api_error');
 });

@@ -116,7 +116,9 @@ lifetime / 2)`, floored at the last renewal + 1 minute and at the end of a
   authorization lifts it. Any other answer without a token (an unknown code
   or text) is NOT a refusal (review 1): the session is kept and the renewal
   tried again after 1, 5, 15, 60 min; "too frequent" / "busy" (Chinese
-  "系统", "异常" included) are pauses. Without `expires_in`, one hour. New
+  "系统异常", "稍后" included) are pauses. Order of the checks (approval,
+  round 2): too frequent, app refused, token refused (`token`, `login`,
+  "登录"), then busy: "token异常" or "登录异常" is a refused token, never a pause. Without `expires_in`, one hour. New
   keys saved while a renewal or a code exchange is in flight move the epoch:
   its answer is dropped, never stored under the new client.
 - **A refused token** (envelope text about the token, or HTTP 401): when the

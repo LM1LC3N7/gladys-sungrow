@@ -661,8 +661,30 @@ test('a renewal answered "system error" (Chinese text) is a pause, never a stop'
   await advance(5 * MINUTE + 10 * SECOND, 10 * SECOND);
   assert.equal(app.blocked, undefined);
   assert.equal(store.data.pause.kind, 'unavailable');
-  assert.ok(store.data.session.refreshToken);
+  assert.equal(store.data.session.refreshToken, 'refresh-1');
+  // After the pause (5 minutes), the renewal is tried again and succeeds.
+  await advance(6 * MINUTE, 10 * SECOND);
+  assert.equal(server.of('refresh').length, 2);
+  assert.equal(store.data.session.refreshToken, 'refresh-2');
+  assert.equal(app.blocked, undefined);
 });
+
+for (const text of ['token异常', '登录异常', '系统检测到token已失效，请稍后重试']) {
+  test(`a renewal answered "${text}" is a refused token: the "session ended" stop`, async (t) => {
+    const store = memoryStore();
+    const server = fakeSungrow({ expiresIn: 600 });
+    const { gladys, app, advance } = await setup(t, { server, store });
+    server.queue('refresh', answer(200, { result_code: 'E1005', result_msg: text }));
+    await advance(5 * MINUTE + 10 * SECOND, 10 * SECOND);
+    assert.equal(app.blocked, 'expired');
+    assert.equal(store.data.block.kind, 'expired');
+    assert.equal(store.data.session, null);
+    assert.match(message(gladys).en, /session ended/);
+    const before = server.requests.length;
+    await advance(12 * HOUR, 10 * MINUTE);
+    assert.equal(server.requests.length, before, 'never retried by itself');
+  });
+}
 
 test('new keys saved while a renewal is in flight: its answer is dropped', async (t) => {
   const server = fakeSungrow({ expiresIn: 600 });

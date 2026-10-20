@@ -175,16 +175,18 @@ export function transientError({ status, headers = {} }, now) {
 }
 
 const RATE = /frequen|too many|too often|rate.?limit|limit.?exceed|exceed.*limit|频繁|超过/i;
-const BUSY = /busy|maintenance|try again later|temporarily|繁忙|异常|系统/i;
+// Narrow on purpose, and checked after the app and the token: "token异常" is a refused token.
+const BUSY = /busy|maintenance|try again later|temporarily|繁忙|系统异常|稍后/i;
 // Only the token or the login: a text about one plant ("unauthorized", "authorization") is no stop.
-const TOKEN = /token|login|未登录/i;
+const TOKEN = /token|login|登录/i;
 const APP = /app.?key|access.?key|secret.?key|app.?id\b|application.?id/i;
 
 /**
  * The error of an answer of the API, or undefined when it succeeded
  * (`result_code` "1"). The texts of iSolarCloud (`result_msg`, `error`,
  * `error_description`) only classify the error; only a safe code is kept.
- * Checked in this order: too frequent, the app refused, the token refused.
+ * Checked in this order: too frequent, the app refused, the token refused,
+ * busy (a "busy" word next to a token text is a refused token, never a pause).
  */
 export function envelopeError(data) {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) {
@@ -202,14 +204,14 @@ export function envelopeError(data) {
   if (RATE.test(text)) {
     return new SungrowError('rate_limited', 'iSolarCloud asks to slow down', { detail });
   }
-  if (BUSY.test(text)) {
-    return new SungrowError('unavailable', 'iSolarCloud is busy', { detail });
-  }
   if (APP.test(text)) {
     return new SungrowError('app_refused', 'iSolarCloud refused the developer app', { detail });
   }
   if (TOKEN.test(text)) {
     return new SungrowError('unauthorized', 'iSolarCloud refused the access token', { detail });
+  }
+  if (BUSY.test(text)) {
+    return new SungrowError('unavailable', 'iSolarCloud is busy', { detail });
   }
   return new SungrowError('api_error', 'iSolarCloud answered with an error', { detail });
 }

@@ -49,7 +49,8 @@ the notes of the version's GitHub Release.
   (it still reads once to lift an "access refused" stop).
 - An unknown error answered to a token renewal no longer ends the session:
   it is tried again after 1, 5, 15 then 60 minutes; a "system error" text is
-  a pause.
+  a pause, but a text about the token or the login ("token异常") is still a
+  refused token that ends the session.
 - New keys saved while a renewal or an authorization is running drop its
   answer.
 - A deleted device takes its index guard states out of `/data`.
