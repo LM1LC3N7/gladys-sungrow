@@ -1,177 +1,271 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "Sungrow iSolarCloud",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial: Sungrow solar and batteries via iSolarCloud, read only: power, energy, grid, battery.",
+    "fr": "Non officiel : solaire et batteries Sungrow par iSolarCloud, lecture seule : puissance, énergie."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-sungrow:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-sungrow/main/cover.png",
+  "categories": ["energy"],
+  "transports": ["cloud"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": {
+        "en": "Sungrow plants in Gladys",
+        "fr": "Les centrales Sungrow dans Gladys"
+      },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial connector, not affiliated with Sungrow. It reads your Sungrow inverters and batteries through the official iSolarCloud OpenAPI, read only: solar power and production, home consumption, energy bought from and fed into the grid, battery charge and power. The solar production and the energy bought are energy indexes, checked before Gladys counts them. It needs a developer app you create yourself on the Sungrow developer portal (free, approved by Sungrow): follow the guide. Your password is typed on the iSolarCloud page only. Never tested yet with a real account. Sungrow and iSolarCloud are trademarks of their owner.",
+        "fr": "Connecteur non officiel, sans lien avec Sungrow. Il lit vos onduleurs et batteries Sungrow par l'API officielle iSolarCloud OpenAPI, en lecture seule : puissance et production solaires, consommation de la maison, énergie achetée au réseau et injectée, charge et puissance de la batterie. La production solaire et l'énergie achetée sont des index d'énergie, contrôlés avant que Gladys les compte. Il faut une application développeur que vous créez vous-même sur le portail développeur de Sungrow (gratuite, validée par Sungrow) : suivez le guide. Votre mot de passe se saisit sur la page d'iSolarCloud seulement. Jamais testé pour l'instant avec un vrai compte. Sungrow et iSolarCloud sont des marques de leur propriétaire."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/LM1LC3N7/gladys-sungrow/blob/main/docs/fr.md",
+          "label": {
+            "en": "Guide (French)",
+            "fr": "Guide (français)"
+          }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-sungrow/blob/main/docs/en.md",
+          "label": {
+            "en": "Guide (English)",
+            "fr": "Guide (anglais)"
+          }
+        },
+        {
+          "url": "https://developer-api.isolarcloud.com/",
+          "label": {
+            "en": "Sungrow developer portal",
+            "fr": "Portail développeur Sungrow"
+          }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
+      "key": "app_steps",
+      "type": "section",
+      "label": {
+        "en": "1. Your developer app",
+        "fr": "1. Votre application développeur"
       },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "description": {
+        "en": "On the Sungrow developer portal, create an account, then an app: answer Yes to \"authorize with OAuth2.0\" and give a redirect URL (the return address of this Gladys, shown here after a first click on Connect, or another address of yours). Wait for Sungrow to approve it. Then copy its Appkey, its Secret Key and its Application Id (the applicationId= of the authorize URL of the portal) below, choose the server of your iSolarCloud account, and save.",
+        "fr": "Sur le portail développeur de Sungrow, créez un compte, puis une application : répondez Oui à « authorize with OAuth2.0 » et donnez une URL de redirection (l'adresse de retour de ce Gladys, affichée ici après un premier clic sur Connecter, ou une autre adresse à vous). Attendez que Sungrow la valide. Copiez ensuite son Appkey, sa Secret Key et son Application Id (le applicationId= de l'URL d'autorisation du portail) ci-dessous, choisissez le serveur de votre compte iSolarCloud, et enregistrez."
+      }
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
+      "key": "server",
       "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
       "required": false,
-      "default": "celsius",
+      "default": "eu",
+      "label": {
+        "en": "iSolarCloud server",
+        "fr": "Serveur iSolarCloud"
+      },
+      "description": {
+        "en": "The server of your account and of your developer app (Europe for France, Belgium, Switzerland).",
+        "fr": "Le serveur de votre compte et de votre application développeur (Europe pour la France, la Belgique, la Suisse)."
+      },
       "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
+        { "value": "eu", "label": { "en": "Europe", "fr": "Europe" } },
+        {
+          "value": "international",
+          "label": { "en": "International (Hong Kong)", "fr": "International (Hong Kong)" }
+        },
+        { "value": "china", "label": { "en": "China", "fr": "Chine" } },
+        { "value": "australia", "label": { "en": "Australia", "fr": "Australie" } },
+        { "value": "india", "label": { "en": "India", "fr": "Inde" } }
       ]
     },
     {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+      "key": "app_key",
+      "type": "string",
+      "required": true,
+      "label": {
+        "en": "Appkey",
+        "fr": "Appkey"
       },
+      "description": {
+        "en": "The Appkey of your developer app.",
+        "fr": "L'Appkey de votre application développeur."
+      }
+    },
+    {
+      "key": "secret_key",
+      "type": "secret",
+      "required": true,
+      "label": {
+        "en": "Secret Key",
+        "fr": "Secret Key"
+      },
+      "description": {
+        "en": "The Secret Key of your developer app. Kept by Gladys in its database, never shown again, sent only to iSolarCloud.",
+        "fr": "La Secret Key de votre application développeur. Gardée par Gladys dans sa base, jamais réaffichée, envoyée seulement à iSolarCloud."
+      }
+    },
+    {
+      "key": "app_id",
+      "type": "string",
+      "required": true,
+      "label": {
+        "en": "Application Id",
+        "fr": "Application Id"
+      },
+      "description": {
+        "en": "The number after applicationId= in the authorize URL the portal shows for your app.",
+        "fr": "Le nombre après applicationId= dans l'URL d'autorisation que le portail affiche pour votre application."
+      },
+      "placeholder": {
+        "en": "e.g. 1234",
+        "fr": "ex. 1234"
+      }
+    },
+    {
+      "key": "sign_in_steps",
+      "type": "section",
+      "label": {
+        "en": "2. Authorize",
+        "fr": "2. Autoriser"
+      },
+      "description": {
+        "en": "Click Connect: the iSolarCloud page opens; sign in, tick your plant(s) and authorize. iSolarCloud sends you back to Gladys and the integration reads your plants. If the redirect URL of your app is not this Gladys, write it in \"Redirect URL\": at the end, copy the whole address the browser shows (it holds code= and state=) and paste it into \"Finish the authorization\" below, within 15 minutes. The tokens are kept in clear in the /data volume of the integration (readable by its container only), sent only to iSolarCloud.",
+        "fr": "Cliquez sur Connecter : la page d'iSolarCloud s'ouvre ; connectez-vous, cochez votre ou vos centrales et autorisez. iSolarCloud vous renvoie vers Gladys et l'intégration lit vos centrales. Si l'URL de redirection de votre application n'est pas ce Gladys, saisissez-la dans « URL de redirection » : à la fin, copiez l'adresse complète affichée par le navigateur (elle contient code= et state=) et collez-la dans « Terminer l'autorisation » plus bas, dans les 15 minutes. Les jetons sont gardés en clair dans le volume /data de l'intégration (lisible par son conteneur seulement), envoyés seulement à iSolarCloud."
+      }
+    },
+    {
+      "key": "redirect_uri",
+      "type": "string",
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "label": {
+        "en": "Redirect URL (optional)",
+        "fr": "URL de redirection (facultative)"
+      },
+      "description": {
+        "en": "Empty: iSolarCloud sends you back to this Gladys. Otherwise the redirect URL of your developer app (https, or http on localhost only): finish by pasting the address the browser ended on.",
+        "fr": "Vide : iSolarCloud vous renvoie vers ce Gladys. Sinon, l'URL de redirection de votre application développeur (https, ou http sur localhost seulement) : terminez en collant l'adresse sur laquelle le navigateur s'est arrêté."
+      },
+      "placeholder": {
+        "en": "https://…",
+        "fr": "https://…"
+      }
+    },
+    {
+      "key": "account",
+      "type": "oauth2",
+      "label": {
+        "en": "iSolarCloud account",
+        "fr": "Compte iSolarCloud"
+      },
+      "description": {
+        "en": "Opens the iSolarCloud authorization page (save the keys first).",
+        "fr": "Ouvre la page d'autorisation d'iSolarCloud (enregistrez d'abord les clés)."
+      }
+    },
+    {
+      "key": "poll_minutes",
+      "type": "number",
+      "required": false,
+      "default": 5,
+      "min": 5,
+      "max": 60,
+      "label": {
+        "en": "Refresh interval (minutes)",
+        "fr": "Intervalle de relecture (minutes)"
+      },
+      "description": {
+        "en": "iSolarCloud updates its data every 5 minutes: one request per read for all the plants, at most 600 requests a day.",
+        "fr": "iSolarCloud met à jour ses données toutes les 5 minutes : une requête par lecture pour toutes les centrales, 600 requêtes par jour au plus."
+      }
+    },
+    {
+      "key": "max_power_kw",
+      "type": "number",
+      "required": false,
+      "default": 36,
+      "min": 1,
+      "max": 1000,
+      "label": {
+        "en": "Maximum power of the installation (kW)",
+        "fr": "Puissance maximale de l'installation (kW)"
+      },
+      "description": {
+        "en": "The most the plant may produce or the home draw from the grid. An index that rises faster, or drops, is held back until you accept it.",
+        "fr": "Le plus que la centrale peut produire ou la maison tirer du réseau. Un index qui monte plus vite, ou qui baisse, est retenu jusqu'à ce que vous l'acceptiez."
+      }
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "required": false,
+      "default": "fr",
+      "label": {
+        "en": "Language of the names and texts",
+        "fr": "Langue des noms et des textes"
+      },
+      "options": [
+        { "value": "fr", "label": { "en": "French", "fr": "Français" } },
+        { "value": "en", "label": { "en": "English", "fr": "Anglais" } }
+      ]
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "finish_sign_in",
+      "timeout_seconds": 30,
+      "label": {
+        "en": "Finish the authorization",
+        "fr": "Terminer l'autorisation"
+      },
+      "description": {
+        "en": "Only with a redirect URL: paste the address the browser ended on after the iSolarCloud page.",
+        "fr": "Seulement avec une URL de redirection : collez l'adresse sur laquelle le navigateur s'est arrêté après la page d'iSolarCloud."
+      },
+      "fields": [
+        {
+          "key": "url",
+          "type": "string",
+          "required": true,
+          "label": {
+            "en": "Address with code= and state=",
+            "fr": "Adresse avec code= et state="
+          },
+          "placeholder": {
+            "en": "https://…?code=…&state=…",
+            "fr": "https://…?code=…&state=…"
+          }
+        }
+      ]
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
-    }
-  ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
-      "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+      "key": "test_connection",
+      "timeout_seconds": 90,
+      "label": {
+        "en": "Test iSolarCloud",
+        "fr": "Tester iSolarCloud"
       },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
-        }
-      ],
-      "variables": [
-        {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
-    {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
       "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
+        "en": "Reads the plants now and shows the result (once every 30 seconds at most).",
+        "fr": "Lit maintenant les centrales et affiche le résultat (une fois toutes les 30 secondes au plus)."
+      }
+    },
+    {
+      "key": "accept_index",
       "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
-        }
-      ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "label": {
+        "en": "Accept the held indexes",
+        "fr": "Accepter les index retenus"
       },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+      "description": {
+        "en": "Only when the status shows an index held back (a jump or a drop) that is right: it is taken at the next read, once.",
+        "fr": "Seulement quand le statut affiche un index retenu (un saut ou une baisse) qui est juste : il est pris à la prochaine lecture, une fois."
+      }
     }
   ]
 }
