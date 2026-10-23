@@ -1,6 +1,6 @@
 {
   "name": "gladys-sungrow",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Sungrow inverters and batteries for Gladys Assistant through the official iSolarCloud OpenAPI: solar power and production, home consumption, grid, battery, energy indexes, read only.",
   "type": "module",
